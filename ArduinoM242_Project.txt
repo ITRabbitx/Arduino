@@ -1,13 +1,19 @@
-int digitalPinPIR = 4;
-int digitalPinUDS = 7;
+//Variablen
+const int digitalPinPIR = 4;
+const int digitalPinUDS = 7;
 const int redPin = 12;
 const int bluePin = 11;
 const int greenPin = 10;
 int PIRstate = 0;
 int UDSstate = 0;
 int dist;
+const int BtnISRpin = 2;
+int Btnstate;
+const int LEDpin1 = 6;
+volatile bool LEDstate1 = false;
+const int LEDpin2 = 9;
 
-
+//Setup 
 void setup()
 {  
  pinMode(digitalPinPIR, INPUT);
@@ -15,11 +21,14 @@ void setup()
  pinMode(redPin, OUTPUT);
  pinMode(bluePin, OUTPUT);
  pinMode(greenPin, OUTPUT);
+ pinMode(BtnISRpin, INPUT);
+ attachInterrupt(digitalPinToInterrupt(BtnISRpin), BtnISR, RISING); // LOW, HIGH, CHANGE, FALLING, RISING
+ pinMode(LEDpin1, OUTPUT);
+ pinMode(LEDpin2, OUTPUT);
  Serial.begin(9600);
 }
 
 
-//void PIRcheckMovement() { //Kontrolliert ob sich etwas bewegt
 
 // Code für den UDS, kopiert vom Tinkercad Beispiel
 long readUltrasonicDistance(int triggerPin, int echoPin)
@@ -36,42 +45,75 @@ long readUltrasonicDistance(int triggerPin, int echoPin)
   return pulseIn(echoPin, HIGH);
 }
 //Ende kopierter code
-            
+
+//Setzt die Helligkeit der RGB-LED via PWM
 void setColor(int red, int green, int blue) {
     digitalWrite(redPin, red);
     digitalWrite(bluePin, blue);
     digitalWrite(greenPin, green);
 }
+//Reagiert auf Aktivität vom USD
+void reactToUSD() {
+  // Messe die ping zeit in cm: 
+  dist = 0.01723 * readUltrasonicDistance(7, 7);  //Code kopiert vom Tinkercad UDS Beispiel
+  if ( (dist >=0) && (dist <=100) ) {
+          setColor(255, 0, 0);
+            analogWrite(redPin, HIGH);
+          Serial.print((String)"Die Distanz ist "+dist);
+    } else if ( (dist >=100) && (dist <=200) ) { 
+            setColor(0, 0, 255);
+          analogWrite(bluePin, HIGH);
+          Serial.print((String)"Die Distanz ist "+dist);
+    } else if ( (dist >=200) && (dist <=300) ) {
+            setColor(0, 255, 0);
+            analogWrite(greenPin, HIGH);
+          Serial.print((String)"Die Distanz ist "+dist);
+    } else {
+            setColor(255, 255, 255);
+          Serial.print("Keine Distanz");
+    }
+}
+//Wenn LEDpin1 ist gleich LEDstate1, setze auf HIGH, sonst auf LOW. (if else).
+void outputBtnResult() {
+  digitalWrite(LEDpin1, LEDstate1 ? HIGH : LOW);
+}
+//ISR
+void BtnISR(){ 
+  //Ich bin auf HIGH
+  LEDstate1 = ! LEDstate1;
+}
+//Setzt die LED des PIR-Sensors auf HIGH.
+void outputPirLED(){
+  digitalWrite(LEDpin2, HIGH);
+  
+}
 
-void loop(){
-PIRstate = digitalRead(digitalPinPIR); //Read the state of the PIR sensor
+//reagiert auf Ativität vom PIR:
+void reactToPIR() { 
+ //Lese den Zustand vom PIR sensor:
+ PIRstate = digitalRead(digitalPinPIR); 
   
   if(PIRstate == HIGH){
-    Serial.print("Bewegung nachegwiesen.");
-    Serial.print("\n");
+    outputPirLED();
+    Serial.print("Bewegung nachegwiesen.\n");
     delay(3000);
-    UDSstate = digitalRead(digitalPinUDS);
-    // measure the ping time in cm
-    dist = 0.01723 * readUltrasonicDistance(7, 7);  //Code kopiert vom Tinkercad UDS Beispiel
-       while(UDSstate == HIGH) {
-              if ( (dist >=0) && (dist <=100) ) {
-              setColor(0, 201, 204);
-                  analogWrite(redPin, HIGH);
-                } else if ( (dist >=100) && (dist <=200) ) { 
-                setColor(52, 168, 83);
-                analogWrite(bluePin, HIGH);
-            } else if ( (dist >=200) && (dist <=300) ) {
-                setColor(247, 120, 138);
-                  analogWrite(greenPin, HIGH);
-              } else {
-                setColor(255, 255, 255);
-              }
-      } 
+
+   
   } else {
-      Serial.print("Keine Bewegung nachgewiesen.");
-      Serial.print("\n");
+      Serial.print("Keine Bewegung nachgewiesen.\n");
       delay(3000);
-  }
+    }
 }
+
+
+//Loop
+void loop(){
+  
+    reactToUSD(); //Function call
+    reactToPIR(); //Function call
+  outputBtnResult(); //Function call
+}
+
+   
 
    
